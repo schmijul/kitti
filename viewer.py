@@ -323,10 +323,11 @@ def load_lidar_data(bin_file: str) -> np.ndarray:
 
 def setup_viewer() -> Simple3DViewer:
     viewer = Simple3DViewer(width=1280, height=720, title="LiDAR Visualization")
-    viewer.camera_distance = 150.0
+    viewer.camera_distance = 60.0
     viewer.camera_angle_x = -0.5  # Look down at ~30 degrees
     viewer.camera_angle_y = 0.0    # Face forward
-    viewer.point_size = 2.0
+    viewer.point_size = 3.0
+    gl.glPointSize(viewer.point_size)
     return viewer
 
 def rotation_matrix(axis, angle):
@@ -398,10 +399,9 @@ def downsample_points(points: np.ndarray, max_points: int = 100000) -> np.ndarra
 def process_frame(lidar_data: np.ndarray, transform: np.ndarray, max_distance: float, max_points: int = 100000) -> np.ndarray:
     if max_distance is not None:
         initial_points = len(lidar_data)
-        # Only include points in front of the vehicle
-        mask = (lidar_data[:, 0] > 0) & (lidar_data[:, 0] < max_distance) & \
-               (lidar_data[:, 1] > -max_distance / 2) & (lidar_data[:, 1] < max_distance / 2) & \
-               (lidar_data[:, 2] > -max_distance / 2) & (lidar_data[:, 2] < max_distance / 2)
+        # Keep all directions and clip by spherical distance for denser, easier-to-read views.
+        distances = np.linalg.norm(lidar_data[:, :3], axis=1)
+        mask = distances < max_distance
         lidar_data = lidar_data[mask]
         print(f"Filtered: {initial_points} -> {len(lidar_data)} points")
 
@@ -415,8 +415,10 @@ def visualize_progressive_mapping(lidar_folder: str,
                                   oxts_folder: str,
                                   max_distance: float = 50.0,
                                   frame_delay: float = 0.1,
-                                  window_size: int = 1,  # Reduced window_size
-                                  max_points_per_frame: int = 100000):
+                                  window_size: int = 1,
+                                  max_points_per_frame: int = 100000,
+                                  accumulation_mode: str = "sliding",
+                                  global_max_points: int = 1500000):
     bin_files = sorted(glob.glob(os.path.join(lidar_folder, '*.bin')))
     oxts_files = sorted(glob.glob(os.path.join(oxts_folder, '*.txt')))
 
@@ -425,6 +427,7 @@ def visualize_progressive_mapping(lidar_folder: str,
 
     viewer = setup_viewer()
     recent_frames = []
+    global_cloud = None
     frame_count = 0
     running = True
 
@@ -461,13 +464,19 @@ def visualize_progressive_mapping(lidar_folder: str,
             transform = get_transform_matrix(oxts_data)
             processed_frame = process_frame(lidar_data, transform, max_distance, max_points_per_frame)
 
-            # Update frame buffer
-            recent_frames.append(processed_frame)
-            if len(recent_frames) > window_size:
-                recent_frames.pop(0)
-
-            # Update visualization
-            combined_cloud = np.vstack(recent_frames) if recent_frames else processed_frame
+            # Update visualization cloud based on selected accumulation mode.
+            if accumulation_mode == "global":
+                if global_cloud is None:
+                    global_cloud = processed_frame
+                else:
+                    global_cloud = np.vstack((global_cloud, processed_frame))
+                global_cloud = downsample_points(global_cloud, global_max_points)
+                combined_cloud = global_cloud
+            else:
+                recent_frames.append(processed_frame)
+                if len(recent_frames) > window_size:
+                    recent_frames.pop(0)
+                combined_cloud = np.vstack(recent_frames) if recent_frames else processed_frame
             viewer.load_points(combined_cloud)
 
             # Render a single frame
@@ -485,6 +494,7 @@ def visualize_progressive_mapping(lidar_folder: str,
             # Optionally, loop the visualization
             frame_count = 0
             recent_frames.clear()
+            global_cloud = None
             print("\nAll frames processed. Restarting visualization.")
 
     # Stop memory tracking and print statistics
@@ -502,14 +512,18 @@ if __name__ == "__main__":
                       help='Folder containing LiDAR .bin files')
     parser.add_argument('--oxts_folder', type=str, default='data/oxts/data',
                       help='Folder containing OXTS .txt files')
-    parser.add_argument('--max_dist', type=float, default=50.0,
+    parser.add_argument('--max_dist', type=float, default=80.0,
                       help='Maximum distance for point filtering')
     parser.add_argument('--delay', type=float, default=0.1,
                       help='Delay between frames (in seconds)')
-    parser.add_argument('--window', type=int, default=1,  # Reduced window_size
+    parser.add_argument('--window', type=int, default=40,
                       help='Number of recent frames to maintain')
     parser.add_argument('--max_points', type=int, default=100000,  # Limit points per frame
                       help='Maximum number of points per frame after downsampling')
+    parser.add_argument('--mode', type=str, choices=['sliding', 'global'], default='global',
+                      help='Accumulation mode: "sliding" keeps recent frames, "global" grows a full map')
+    parser.add_argument('--global_max_points', type=int, default=1500000,
+                      help='Maximum total points for global accumulation mode')
 
     args = parser.parse_args()
 
@@ -527,5 +541,7 @@ if __name__ == "__main__":
         max_distance=args.max_dist,
         frame_delay=args.delay,
         window_size=args.window,
-        max_points_per_frame=args.max_points
+        max_points_per_frame=args.max_points,
+        accumulation_mode=args.mode,
+        global_max_points=args.global_max_points
     )
