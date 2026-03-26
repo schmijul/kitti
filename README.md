@@ -6,9 +6,8 @@ This project visualizes KITTI Velodyne LiDAR scans in 3D and can build a progres
 
 - Real-time playback of KITTI `.bin` LiDAR frames
 - Pose-based global accumulation using KITTI OXTS data
-- Two accumulation modes:
-- `global`: map grows over time (SLAM-like)
-- `sliding`: only last `N` frames are shown
+- Two accumulation modes: `global` (map grows over time) and `sliding` (only last `N` frames)
+- Live HUD in window title (frame index, visible points, camera distance)
 - Mouse + keyboard camera controls
 
 ## Requirements
@@ -25,6 +24,12 @@ This project visualizes KITTI Velodyne LiDAR scans in 3D and can build a progres
 cd /home/schmijul/fun/kitti
 source slam_env/bin/activate
 python3 viewer.py --mode global --delay 0.05 --max_dist 80 --max_points 120000 --global_max_points 1800000 --center_mode latest
+```
+
+Recommended "stable view" preset:
+
+```bash
+python3 viewer.py --mode global --delay 0.03 --max_dist 100 --max_points 150000 --global_max_points 2200000 --center_mode latest
 ```
 
 ## Controls
@@ -63,6 +68,13 @@ Then in the viewer:
 - Zoom in with mouse wheel
 - Increase point size with `+`
 - Rotate camera with mouse drag
+
+### Scene looks weird or drifting
+
+- Use `--center_mode latest` (best default for ego-follow view)
+- Try `--center_mode mean` if you want a static global center
+- Keep auto camera enabled (do not pass `--no_auto_camera`)
+- If the map looks too sparse, increase `--max_dist` and `--max_points`
 
 ### Performance is low
 
