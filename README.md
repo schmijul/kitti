@@ -46,6 +46,7 @@ python3 viewer.py --mode global --delay 0.05 --max_dist 80 --max_points 120000 -
 - `--window` number of recent frames in `sliding` mode
 - `--center_mode {none,latest,mean}` recenter view for stability
 - `--no_auto_camera` disable automatic camera distance
+- `--no_hud` disable live HUD status in window title/console
 
 ## Troubleshooting
 

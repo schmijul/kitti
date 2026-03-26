@@ -420,7 +420,8 @@ def visualize_progressive_mapping(lidar_folder: str,
                                   accumulation_mode: str = "sliding",
                                   global_max_points: int = 1500000,
                                   center_mode: str = "latest",
-                                  auto_camera: bool = True):
+                                  auto_camera: bool = True,
+                                  hud: bool = True):
     bin_files = sorted(glob.glob(os.path.join(lidar_folder, '*.bin')))
     oxts_files = sorted(glob.glob(os.path.join(oxts_folder, '*.txt')))
 
@@ -497,6 +498,17 @@ def visualize_progressive_mapping(lidar_folder: str,
 
             viewer.load_points(display_cloud)
 
+            if hud:
+                title = (
+                    f"LiDAR Visualization | Frame {frame_count + 1}/{len(bin_files)}"
+                    f" | Points {len(display_cloud):,} | CamDist {viewer.camera_distance:.1f}m"
+                )
+                glfw.set_window_title(viewer.window, title)
+                print(
+                    f" | HUD: points={len(display_cloud):,}, cam={viewer.camera_distance:.1f}m",
+                    end=""
+                )
+
             # Render a single frame
             viewer.draw_frame()
             glfw.swap_buffers(viewer.window)
@@ -546,6 +558,8 @@ if __name__ == "__main__":
                       help='Recenter mode for display: none, latest ego pose, or mean cloud center')
     parser.add_argument('--no_auto_camera', action='store_true',
                       help='Disable automatic camera distance adaptation')
+    parser.add_argument('--no_hud', action='store_true',
+                      help='Disable HUD info (window title + console status)')
 
     args = parser.parse_args()
 
@@ -567,5 +581,6 @@ if __name__ == "__main__":
         accumulation_mode=args.mode,
         global_max_points=args.global_max_points,
         center_mode=args.center_mode,
-        auto_camera=not args.no_auto_camera
+        auto_camera=not args.no_auto_camera,
+        hud=not args.no_hud
     )
