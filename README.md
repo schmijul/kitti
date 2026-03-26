@@ -24,7 +24,7 @@ This project visualizes KITTI Velodyne LiDAR scans in 3D and can build a progres
 ```bash
 cd /home/schmijul/fun/kitti
 source slam_env/bin/activate
-python3 viewer.py --mode global --delay 0.05 --max_dist 80 --max_points 120000 --global_max_points 1800000
+python3 viewer.py --mode global --delay 0.05 --max_dist 80 --max_points 120000 --global_max_points 1800000 --center_mode latest
 ```
 
 ## Controls
@@ -44,6 +44,8 @@ python3 viewer.py --mode global --delay 0.05 --max_dist 80 --max_points 120000 -
 - `--max_points` max points per frame after downsampling
 - `--global_max_points` cap for full accumulated map
 - `--window` number of recent frames in `sliding` mode
+- `--center_mode {none,latest,mean}` recenter view for stability
+- `--no_auto_camera` disable automatic camera distance
 
 ## Troubleshooting
 
@@ -52,7 +54,7 @@ python3 viewer.py --mode global --delay 0.05 --max_dist 80 --max_points 120000 -
 Try this:
 
 ```bash
-python3 viewer.py --mode global --max_dist 100 --max_points 150000 --global_max_points 2200000 --delay 0.03
+python3 viewer.py --mode global --max_dist 100 --max_points 150000 --global_max_points 2200000 --delay 0.03 --center_mode latest
 ```
 
 Then in the viewer:

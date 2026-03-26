@@ -418,7 +418,9 @@ def visualize_progressive_mapping(lidar_folder: str,
                                   window_size: int = 1,
                                   max_points_per_frame: int = 100000,
                                   accumulation_mode: str = "sliding",
-                                  global_max_points: int = 1500000):
+                                  global_max_points: int = 1500000,
+                                  center_mode: str = "latest",
+                                  auto_camera: bool = True):
     bin_files = sorted(glob.glob(os.path.join(lidar_folder, '*.bin')))
     oxts_files = sorted(glob.glob(os.path.join(oxts_folder, '*.txt')))
 
@@ -477,7 +479,23 @@ def visualize_progressive_mapping(lidar_folder: str,
                 if len(recent_frames) > window_size:
                     recent_frames.pop(0)
                 combined_cloud = np.vstack(recent_frames) if recent_frames else processed_frame
-            viewer.load_points(combined_cloud)
+            # Recenter cloud for easier viewing.
+            display_cloud = combined_cloud
+            if center_mode != "none" and len(combined_cloud) > 0:
+                if center_mode == "mean":
+                    center = np.mean(combined_cloud[:, :3], axis=0)
+                else:  # "latest"
+                    center = transform[:3, 3]
+                display_cloud = combined_cloud.copy()
+                display_cloud[:, :3] -= center
+
+            # Optional automatic camera distance based on visible spread.
+            if auto_camera and len(display_cloud) > 0:
+                radial = np.linalg.norm(display_cloud[:, :3], axis=1)
+                p95 = float(np.percentile(radial, 95))
+                viewer.camera_distance = float(np.clip(p95 * 1.25, 20.0, 250.0))
+
+            viewer.load_points(display_cloud)
 
             # Render a single frame
             viewer.draw_frame()
@@ -524,6 +542,10 @@ if __name__ == "__main__":
                       help='Accumulation mode: "sliding" keeps recent frames, "global" grows a full map')
     parser.add_argument('--global_max_points', type=int, default=1500000,
                       help='Maximum total points for global accumulation mode')
+    parser.add_argument('--center_mode', type=str, choices=['none', 'latest', 'mean'], default='latest',
+                      help='Recenter mode for display: none, latest ego pose, or mean cloud center')
+    parser.add_argument('--no_auto_camera', action='store_true',
+                      help='Disable automatic camera distance adaptation')
 
     args = parser.parse_args()
 
@@ -543,5 +565,7 @@ if __name__ == "__main__":
         window_size=args.window,
         max_points_per_frame=args.max_points,
         accumulation_mode=args.mode,
-        global_max_points=args.global_max_points
+        global_max_points=args.global_max_points,
+        center_mode=args.center_mode,
+        auto_camera=not args.no_auto_camera
     )
